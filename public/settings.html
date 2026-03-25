@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veylog — Paramètres</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { font-family: 'JetBrains Mono', monospace; box-sizing: border-box; }
+    body { background: #0f1117; color: #d1d5db; }
+    ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: #0f1117; } ::-webkit-scrollbar-thumb { background: #2d3142; border-radius: 3px; }
+    .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; font-size: 13px; color: #9ca3af; cursor: pointer; transition: all 0.15s; text-decoration: none; }
+    .sidebar-item:hover { background: rgba(255,255,255,0.05); color: #e5e7eb; }
+    .sidebar-item.active { background: rgba(34,211,238,0.08); color: #22d3ee; border-left: 2px solid #22d3ee; padding-left: 10px; }
+    .panel { background: #141720; border: 1px solid #1e2330; border-radius: 8px; }
+    .panel-header { border-bottom: 1px solid #1e2330; padding: 10px 16px; }
+    .panel-accent-cyan  { border-left: 3px solid #22d3ee; }
+    .panel-accent-purple{ border-left: 3px solid #a78bfa; }
+    .panel-accent-green { border-left: 3px solid #22c55e; }
+    .panel-accent-red   { border-left: 3px solid #ef4444; }
+    .btn-terminal { background: #1a1d24; border: 1px solid #374151; color: #9ca3af; padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+    .btn-terminal:hover { border-color: #22d3ee; color: #22d3ee; }
+    .btn-primary { background: rgba(34,211,238,0.08); border: 1px solid #22d3ee; color: #22d3ee; padding: 6px 16px; border-radius: 5px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+    .btn-primary:hover { background: rgba(34,211,238,0.18); }
+    .btn-danger { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.4); color: #ef4444; padding: 6px 16px; border-radius: 5px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+    .btn-danger:hover { background: rgba(239,68,68,0.18); }
+    .form-input { background: #1a1d24; border: 1px solid #2d3142; color: #e5e7eb; border-radius: 6px; padding: 8px 12px; font-size: 13px; width: 100%; outline: none; transition: border-color 0.15s; }
+    .form-input:focus { border-color: #22d3ee; }
+    .form-label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; display: block; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .status-dot.online  { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+    .status-dot.offline { background: #ef4444; }
+    .status-dot.checking{ background: #eab308; animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .toast { animation: slideIn 0.25s ease; }
+    @keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+  <aside class="fixed left-0 top-0 h-full w-52 bg-[#0a0c12] border-r border-gray-900 z-40 flex flex-col">
+    <div class="p-4 border-b border-gray-900">
+      <div class="flex items-center gap-2.5">
+        <svg class="w-8 h-8 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <div class="text-cyan-400 font-bold text-sm tracking-widest">VEYLOG</div>
+          <div class="text-gray-600 text-xs">Log Analyzer</div>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 p-2 space-y-0.5 mt-1">
+      <a href="index.html" class="sidebar-item">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zM8 4a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H9a1 1 0 01-1-1V4zM15 3a1 1 0 00-1 1v12a1 1 0 001 1h2a1 1 0 001-1V4a1 1 0 00-1-1h-2z"/></svg>
+        Dashboard
+      </a>
+      <a href="analyze.html" class="sidebar-item">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+        Analyser
+      </a>
+      <a href="report.html" class="sidebar-item">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd"/></svg>
+        Rapport
+      </a>
+      <a href="settings.html" class="sidebar-item active">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+        Paramètres
+      </a>
+    </nav>
+    <div class="p-3 border-t border-gray-900">
+      <div class="flex items-center gap-2">
+        <span class="status-dot checking" id="ollamaStatusDot"></span>
+        <span class="text-xs text-gray-600" id="ollamaStatusText">Vérification...</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Contenu principal ──────────────────────────────────────────── -->
+  <main class="ml-52 flex-1 p-6 max-w-3xl">
+
+    <div class="mb-5">
+      <h1 class="text-lg font-bold text-white">Paramètres</h1>
+      <p class="text-xs text-gray-600 mt-0.5">Configuration de Veylog</p>
+    </div>
+
+    <div class="space-y-5">
+
+      <!-- Connexion Ollama -->
+      <div class="panel panel-accent-cyan">
+        <div class="panel-header flex items-center justify-between">
+          <span class="text-xs font-semibold text-cyan-400 tracking-wider">CONNEXION OLLAMA</span>
+          <div class="flex items-center gap-2">
+            <span class="status-dot checking" id="testStatusDot"></span>
+            <span class="text-xs text-gray-600" id="testStatusText">Non testé</span>
+          </div>
+        </div>
+        <div class="p-4 space-y-4">
+          <div>
+            <label class="form-label">URL de l'API Ollama</label>
+            <input type="url" id="ollamaUrl" class="form-input" placeholder="http://ollama:11434">
+            <p class="text-xs text-gray-700 mt-1">En Docker Compose : <code class="text-gray-500">http://ollama:11434</code> — En local : <code class="text-gray-500">http://localhost:11434</code></p>
+          </div>
+          <div>
+            <label class="form-label">Modèle par défaut</label>
+            <div class="flex gap-2">
+              <select id="defaultModel" class="form-input flex-1" style="background:#1a1d24;border:1px solid #2d3142;color:#e5e7eb;border-radius:6px;padding:8px 12px;font-size:13px;outline:none;">
+                <option value="">Chargement des modèles...</option>
+              </select>
+              <input type="text" id="defaultModelManual" class="form-input" style="width:220px" placeholder="ou saisir manuellement">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="testOllama()" class="btn-terminal flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd"/>
+              </svg>
+              Tester la connexion
+            </button>
+            <button onclick="loadOllamaModels()" class="btn-terminal">↻ Rafraîchir modèles</button>
+          </div>
+
+          <!-- Liste des modèles disponibles -->
+          <div id="modelsSection" style="display:none">
+            <div class="text-xs text-gray-600 mb-2 tracking-wider">MODÈLES INSTALLÉS</div>
+            <div class="space-y-1" id="modelsList"></div>
+            <div class="mt-3 p-3 bg-gray-900 border border-gray-800 rounded text-xs">
+              <div class="text-gray-500 mb-1">Pour installer un modèle :</div>
+              <code class="text-cyan-400">docker exec veylog-ollama ollama pull llama3.3:70b</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fichiers logs -->
+      <div class="panel panel-accent-purple">
+        <div class="panel-header">
+          <span class="text-xs font-semibold text-purple-400 tracking-wider">FICHIERS LOGS</span>
+        </div>
+        <div class="p-4 space-y-4">
+          <div>
+            <label class="form-label">Chemin du volume logs</label>
+            <input type="text" id="logsPath" class="form-input" placeholder="/var/log">
+            <p class="text-xs text-gray-700 mt-1">Monté en lecture seule via Docker volume. Ne pas modifier sauf configuration avancée.</p>
+          </div>
+          <div>
+            <label class="form-label">Lignes max par fichier</label>
+            <input type="number" id="maxLines" class="form-input" placeholder="300" min="50" max="2000" style="width:150px">
+            <p class="text-xs text-gray-700 mt-1">Nombre de lignes à analyser par fichier après filtrage. Augmenter pour plus de précision (plus lent).</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Boutons de sauvegarde -->
+      <div class="flex gap-3 items-center">
+        <button onclick="saveSettings()" class="btn-primary flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293z"/>
+          </svg>
+          Sauvegarder
+        </button>
+        <button onclick="resetDefaults()" class="btn-terminal">Restaurer défauts</button>
+        <span class="text-xs text-gray-700" id="saveStatus"></span>
+      </div>
+
+      <!-- Zone de danger -->
+      <div class="panel panel-accent-red">
+        <div class="panel-header">
+          <span class="text-xs font-semibold text-red-400 tracking-wider">ZONE DE DANGER</span>
+        </div>
+        <div class="p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm text-gray-300">Supprimer l'historique des analyses</div>
+              <div class="text-xs text-gray-600">Supprime tous les rapports sauvegardés. Irréversible.</div>
+            </div>
+            <button onclick="clearHistory()" class="btn-danger">Supprimer l'historique</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Infos version -->
+      <div class="panel p-4">
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="flex justify-between">
+            <span class="text-gray-600">Version Veylog</span>
+            <span class="text-gray-400">1.0.0</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Node.js</span>
+            <span class="text-gray-400" id="infoNode">—</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Stack</span>
+            <span class="text-gray-400">Express 4 + Vanilla JS</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600">Données sortantes</span>
+            <span class="text-green-400">Aucune — 100% local</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div class="fixed bottom-4 right-4 space-y-2 z-50" id="toastContainer"></div>
+
+  <script src="js/app.js"></script>
+  <script>
+    'use strict';
+
+    // ── Chargement des paramètres ──────────────────────────────────────
+
+    async function init() {
+      try {
+        const settings = await apiGet('/api/settings');
+        document.getElementById('ollamaUrl').value = settings.ollamaUrl || '';
+        document.getElementById('logsPath').value = settings.logsPath || '/var/log';
+        document.getElementById('maxLines').value = settings.maxLines || 300;
+        document.getElementById('defaultModelManual').value = settings.defaultModel || '';
+        await loadOllamaModels(settings.defaultModel);
+      } catch (e) {
+        showToast('Erreur chargement config : ' + e.message, 'error');
+      }
+    }
+
+    // ── Modèles Ollama ─────────────────────────────────────────────────
+
+    async function loadOllamaModels(currentDefault) {
+      const select = document.getElementById('defaultModel');
+      const section = document.getElementById('modelsSection');
+      const list = document.getElementById('modelsList');
+
+      try {
+        const data = await apiGet('/api/ollama/models');
+        const models = data.models || [];
+
+        if (!models.length) {
+          select.innerHTML = '<option value="">Aucun modèle installé</option>';
+          section.style.display = 'none';
+          return;
+        }
+
+        const def = currentDefault || document.getElementById('defaultModelManual').value;
+        select.innerHTML = models.map(m =>
+          `<option value="${escapeHtml(m.name)}" ${m.name === def ? 'selected' : ''}>
+            ${escapeHtml(m.name)}
+          </option>`
+        ).join('');
+
+        section.style.display = 'block';
+        list.innerHTML = models.map(m => `
+          <div class="flex items-center justify-between px-3 py-2 rounded bg-gray-900 border border-gray-800">
+            <div>
+              <span class="text-sm text-gray-300 font-medium">${escapeHtml(m.name)}</span>
+              <span class="text-xs text-gray-600 ml-2">${formatSize(m.size || 0)}</span>
+            </div>
+            <button onclick="document.getElementById('defaultModel').value='${escapeHtml(m.name)}'"
+                    class="btn-terminal text-xs">Utiliser</button>
+          </div>
+        `).join('');
+
+      } catch {
+        select.innerHTML = '<option value="">Ollama inaccessible</option>';
+      }
+    }
+
+    // ── Test de connexion Ollama ───────────────────────────────────────
+
+    async function testOllama() {
+      const dot = document.getElementById('testStatusDot');
+      const text = document.getElementById('testStatusText');
+      const url = document.getElementById('ollamaUrl').value;
+
+      dot.className = 'status-dot checking';
+      text.textContent = 'Test en cours...';
+
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+
+        if (data.ollama === 'connected') {
+          dot.className = 'status-dot online';
+          text.textContent = 'Connecté ✓';
+          showToast('Connexion Ollama réussie', 'success');
+          await loadOllamaModels();
+        } else {
+          dot.className = 'status-dot offline';
+          text.textContent = 'Non connecté';
+          showToast('Ollama inaccessible — vérifiez l\'URL et l\'état du container', 'error', 5000);
+        }
+      } catch (e) {
+        dot.className = 'status-dot offline';
+        text.textContent = 'Erreur';
+        showToast('Erreur de connexion : ' + e.message, 'error');
+      }
+    }
+
+    // ── Sauvegarde ─────────────────────────────────────────────────────
+
+    async function saveSettings() {
+      const model = document.getElementById('defaultModelManual').value ||
+                    document.getElementById('defaultModel').value;
+
+      const payload = {
+        ollamaUrl: document.getElementById('ollamaUrl').value.trim(),
+        logsPath:  document.getElementById('logsPath').value.trim(),
+        maxLines:  parseInt(document.getElementById('maxLines').value) || 300,
+        defaultModel: model,
+      };
+
+      // Validation basique
+      if (!payload.ollamaUrl) {
+        showToast('L\'URL Ollama ne peut pas être vide', 'warn');
+        return;
+      }
+      if (payload.maxLines < 50 || payload.maxLines > 5000) {
+        showToast('Le nombre de lignes doit être entre 50 et 5000', 'warn');
+        return;
+      }
+
+      try {
+        await apiPost('/api/settings', payload);
+        document.getElementById('saveStatus').textContent = '✓ Sauvegardé';
+        setTimeout(() => { document.getElementById('saveStatus').textContent = ''; }, 3000);
+        showToast('Paramètres sauvegardés', 'success');
+      } catch (e) {
+        showToast('Erreur sauvegarde : ' + e.message, 'error');
+      }
+    }
+
+    async function resetDefaults() {
+      if (!confirm('Restaurer les paramètres par défaut ?')) return;
+      document.getElementById('ollamaUrl').value = 'http://ollama:11434';
+      document.getElementById('logsPath').value = '/var/log';
+      document.getElementById('maxLines').value = '300';
+      document.getElementById('defaultModelManual').value = '';
+      await saveSettings();
+      showToast('Paramètres réinitialisés', 'info');
+    }
+
+    // ── Supprimer l'historique ─────────────────────────────────────────
+
+    async function clearHistory() {
+      if (!confirm('Supprimer TOUT l\'historique des analyses ? Cette action est irréversible.')) return;
+      try {
+        await fetch('/api/reports/history', { method: 'DELETE' }).catch(() => {});
+        // Appel direct à l'API de suppression (à implémenter si nécessaire)
+        // Pour l'instant on affiche juste un message
+        showToast('Pour supprimer manuellement : docker exec veylog rm -rf /app/config/reports /app/config/history.json', 'info', 8000);
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

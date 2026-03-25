@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veylog — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { font-family: 'JetBrains Mono', monospace; box-sizing: border-box; }
+    body { background: #0f1117; color: #d1d5db; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0f1117; }
+    ::-webkit-scrollbar-thumb { background: #2d3142; border-radius: 3px; }
+    /* Sidebar */
+    .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; font-size: 13px; color: #9ca3af; cursor: pointer; transition: all 0.15s; text-decoration: none; }
+    .sidebar-item:hover { background: rgba(255,255,255,0.05); color: #e5e7eb; }
+    .sidebar-item.active { background: rgba(34,211,238,0.08); color: #22d3ee; border-left: 2px solid #22d3ee; padding-left: 10px; }
+    /* Panels */
+    .panel { background: #141720; border: 1px solid #1e2330; border-radius: 8px; }
+    .panel-header { border-bottom: 1px solid #1e2330; padding: 10px 16px; }
+    .panel-accent-cyan  { border-left: 3px solid #22d3ee; }
+    .panel-accent-purple{ border-left: 3px solid #a78bfa; }
+    .panel-accent-green { border-left: 3px solid #22c55e; }
+    .panel-accent-red   { border-left: 3px solid #ef4444; }
+    .panel-accent-orange{ border-left: 3px solid #f97316; }
+    /* Boutons */
+    .btn-terminal { background: #1a1d24; border: 1px solid #374151; color: #9ca3af; padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+    .btn-terminal:hover { border-color: #22d3ee; color: #22d3ee; }
+    .btn-terminal:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: rgba(34,211,238,0.08); border: 1px solid #22d3ee; color: #22d3ee; padding: 5px 14px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+    .btn-primary:hover { background: rgba(34,211,238,0.15); }
+    .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+    /* Sévérité */
+    .severity-badge { display: inline-block; border-radius: 4px; font-weight: 700; font-size: 11px; padding: 2px 8px; }
+    .severity-critique { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+    .severity-eleve    { background: rgba(249,115,22,0.12); color: #f97316; border: 1px solid rgba(249,115,22,0.3); }
+    .severity-moyen    { background: rgba(234,179,8,0.12);  color: #eab308; border: 1px solid rgba(234,179,8,0.3); }
+    .severity-faible   { background: rgba(34,197,94,0.12);  color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+    .severity-info     { background: rgba(129,140,248,0.12);color: #818cf8; border: 1px solid rgba(129,140,248,0.3); }
+    .severity-ok       { background: rgba(34,197,94,0.12);  color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+    /* Log cards */
+    .log-card { background: #141720; border: 1px solid #1e2330; border-radius: 6px; transition: all 0.15s; }
+    .log-card:hover { border-color: #374151; background: #191c28; }
+    .log-card.selected { border-color: rgba(34,211,238,0.4); background: rgba(34,211,238,0.04); }
+    /* Status dots */
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .status-dot.online  { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+    .status-dot.offline { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+    .status-dot.checking{ background: #eab308; animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    /* Toasts */
+    .toast { animation: slideIn 0.25s ease; }
+    @keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    /* Progress */
+    .progress-bar { background: linear-gradient(90deg, #22d3ee 0%, #a78bfa 100%); border-radius: 4px; height: 100%; transition: width 0.4s ease; }
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+  <aside class="fixed left-0 top-0 h-full w-52 bg-[#0a0c12] border-r border-gray-900 z-40 flex flex-col">
+    <!-- Logo -->
+    <div class="p-4 border-b border-gray-900">
+      <div class="flex items-center gap-2.5">
+        <svg class="w-8 h-8 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="18" cy="18" r="4" fill="#22d3ee" stroke="none" opacity="0.15"/>
+          <path d="M16.5 18h3M18 16.5v3" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <div class="text-cyan-400 font-bold text-sm tracking-widest">VEYLOG</div>
+          <div class="text-gray-600 text-xs">Log Analyzer</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 p-2 space-y-0.5 mt-1">
+      <a href="index.html" class="sidebar-item active">
+        <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zM8 4a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H9a1 1 0 01-1-1V4zM15 3a1 1 0 00-1 1v12a1 1 0 001 1h2a1 1 0 001-1V4a1 1 0 00-1-1h-2z"/>
+        </svg>
+        Dashboard
+      </a>
+      <a href="analyze.html" class="sidebar-item">
+        <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+        </svg>
+        Analyser
+      </a>
+      <a href="report.html" class="sidebar-item">
+        <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd"/>
+        </svg>
+        Rapport
+      </a>
+      <a href="settings.html" class="sidebar-item">
+        <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+        </svg>
+        Paramètres
+      </a>
+    </nav>
+
+    <!-- Statut Ollama -->
+    <div class="p-3 border-t border-gray-900">
+      <div class="flex items-center gap-2">
+        <span class="status-dot checking" id="ollamaStatusDot"></span>
+        <span class="text-xs text-gray-600" id="ollamaStatusText">Vérification...</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Contenu principal ──────────────────────────────────────────── -->
+  <main class="ml-52 flex-1 p-6">
+
+    <!-- En-tête -->
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h1 class="text-lg font-bold text-white">Dashboard</h1>
+        <p class="text-xs text-gray-600 mt-0.5">Vue d'ensemble du système de logs</p>
+      </div>
+      <button onclick="refreshAll()" class="btn-terminal text-xs flex items-center gap-1.5">
+        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+        </svg>
+        Rafraîchir
+      </button>
+    </div>
+
+    <!-- Cartes de stats -->
+    <div class="grid grid-cols-4 gap-4 mb-6">
+      <div class="panel panel-accent-cyan p-4">
+        <div class="text-xs text-gray-600 mb-1 tracking-wider">FICHIERS LOGS</div>
+        <div class="text-3xl font-bold text-white" id="statFiles">—</div>
+        <div class="text-xs text-gray-600 mt-1">disponibles dans /var/log</div>
+      </div>
+      <div class="panel panel-accent-purple p-4">
+        <div class="text-xs text-gray-600 mb-1 tracking-wider">DERNIÈRE ANALYSE</div>
+        <div class="text-sm font-bold text-white leading-tight" id="statLastDate">Aucune</div>
+        <div class="text-xs mt-1" id="statLastSeverity">—</div>
+      </div>
+      <div class="panel panel-accent-green p-4">
+        <div class="text-xs text-gray-600 mb-1 tracking-wider">ANALYSES TOTALES</div>
+        <div class="text-3xl font-bold text-white" id="statTotal">0</div>
+        <div class="text-xs text-gray-600 mt-1">dans l'historique</div>
+      </div>
+      <div class="panel panel-accent-orange p-4">
+        <div class="text-xs text-gray-600 mb-1 tracking-wider">OLLAMA</div>
+        <div class="text-sm font-bold" id="statOllama">—</div>
+        <div class="text-xs text-gray-600 mt-1" id="statModel">—</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-5">
+
+      <!-- Liste des fichiers logs -->
+      <div class="col-span-2 panel panel-accent-cyan flex flex-col">
+        <div class="panel-header flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-cyan-400 tracking-wider">FICHIERS LOGS</span>
+            <span class="text-xs text-gray-600" id="selectedCount"></span>
+          </div>
+          <div class="flex gap-1.5">
+            <button onclick="selectAll()" class="btn-terminal">Tout</button>
+            <button onclick="deselectAll()" class="btn-terminal">Aucun</button>
+            <button onclick="launchAnalysis()" id="analyzeBtn" class="btn-primary" disabled>→ Analyser</button>
+          </div>
+        </div>
+        <div class="p-3">
+          <!-- Filtres types -->
+          <div class="flex gap-1.5 flex-wrap mb-3" id="typeFilters"></div>
+          <!-- Liste -->
+          <div class="space-y-1 max-h-[420px] overflow-y-auto pr-1" id="logFilesList">
+            <div class="text-gray-600 text-xs text-center py-10">
+              <svg class="w-6 h-6 mx-auto mb-2 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              </svg>
+              Chargement...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Colonne droite -->
+      <div class="flex flex-col gap-4">
+
+        <!-- Historique -->
+        <div class="panel panel-accent-purple flex-1">
+          <div class="panel-header flex items-center justify-between">
+            <span class="text-xs font-semibold text-purple-400 tracking-wider">DERNIÈRES ANALYSES</span>
+            <a href="report.html" class="text-xs text-gray-600 hover:text-gray-400">Voir tout →</a>
+          </div>
+          <div class="p-2 space-y-0.5" id="historyList">
+            <div class="text-gray-700 text-xs text-center py-6">Aucune analyse</div>
+          </div>
+        </div>
+
+        <!-- Infos système -->
+        <div class="panel panel-accent-green">
+          <div class="panel-header">
+            <span class="text-xs font-semibold text-green-400 tracking-wider">SYSTÈME</span>
+          </div>
+          <div class="p-3 space-y-2">
+            <div class="flex justify-between text-xs">
+              <span class="text-gray-600">Volume logs</span>
+              <span class="text-gray-300 font-mono truncate ml-2" id="infoLogsPath">/var/log</span>
+            </div>
+            <div class="flex justify-between text-xs">
+              <span class="text-gray-600">Serveur Veylog</span>
+              <span class="text-green-400">● Actif</span>
+            </div>
+            <div class="flex justify-between text-xs">
+              <span class="text-gray-600">Taille totale</span>
+              <span class="text-gray-300" id="infoTotalSize">—</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast container -->
+  <div class="fixed bottom-4 right-4 space-y-2 z-50" id="toastContainer"></div>
+
+  <script src="js/app.js"></script>
+  <script>
+    'use strict';
+
+    let allFiles = [];
+    const selectedFiles = new Set();
+    let activeTypeFilter = null;
+
+    // ── Initialisation ──────────────────────────────────────────────────
+
+    async function init() {
+      await Promise.all([
+        loadStats(),
+        loadFiles(),
+        loadHistory(),
+      ]);
+    }
+
+    async function refreshAll() {
+      await init();
+      showToast('Données rafraîchies', 'success', 2000);
+    }
+
+    // ── Stats & statut Ollama ───────────────────────────────────────────
+
+    async function loadStats() {
+      try {
+        const [health, settings] = await Promise.all([
+          apiGet('/api/health'),
+          apiGet('/api/settings'),
+        ]);
+
+        const ollamaEl = document.getElementById('statOllama');
+        if (health.ollama === 'connected') {
+          ollamaEl.className = 'text-sm font-bold text-green-400';
+          ollamaEl.textContent = '● Connecté';
+        } else {
+          ollamaEl.className = 'text-sm font-bold text-red-400';
+          ollamaEl.textContent = '● Déconnecté';
+        }
+        document.getElementById('statModel').textContent = settings.defaultModel || '—';
+      } catch { /* ignorer */ }
+    }
+
+    // ── Liste des fichiers ──────────────────────────────────────────────
+
+    async function loadFiles() {
+      try {
+        const data = await apiGet('/api/logs/list');
+        allFiles = data.files || [];
+
+        document.getElementById('statFiles').textContent = allFiles.length;
+        document.getElementById('infoLogsPath').textContent = data.logsPath || '/var/log';
+
+        const totalSize = allFiles.reduce((s, f) => s + f.size, 0);
+        document.getElementById('infoTotalSize').textContent = formatSize(totalSize);
+
+        renderTypeFilters();
+        renderFiles(allFiles);
+        updateSelectedCount();
+      } catch (e) {
+        document.getElementById('logFilesList').innerHTML =
+          `<div class="text-red-400 text-xs text-center py-8">✗ ${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    function renderTypeFilters() {
+      const counts = {};
+      allFiles.forEach(f => { counts[f.type] = (counts[f.type] || 0) + 1; });
+
+      const typeColors = {
+        auth:'border-red-700 text-red-400', syslog:'border-blue-700 text-blue-400',
+        kernel:'border-purple-700 text-purple-400', nginx:'border-green-700 text-green-400',
+        apache:'border-green-600 text-green-300', mysql:'border-orange-700 text-orange-400',
+        cron:'border-yellow-700 text-yellow-400', daemon:'border-cyan-700 text-cyan-400',
+        firewall:'border-red-600 text-red-300', fail2ban:'border-orange-600 text-orange-300',
+        generic:'border-gray-700 text-gray-500',
+      };
+
+      const c = document.getElementById('typeFilters');
+      c.innerHTML = `<button onclick="filterByType(null)"
+        class="type-btn text-xs px-2 py-0.5 rounded border border-cyan-600 text-cyan-400 opacity-100">
+        Tous (${allFiles.length})
+      </button>`;
+
+      Object.entries(counts).sort((a,b)=>b[1]-a[1]).forEach(([type, n]) => {
+        const cls = typeColors[type] || 'border-gray-700 text-gray-400';
+        c.innerHTML += `<button onclick="filterByType('${type}')"
+          class="type-btn text-xs px-2 py-0.5 rounded border ${cls} opacity-60 hover:opacity-100">
+          ${type} (${n})
+        </button>`;
+      });
+    }
+
+    function filterByType(type) {
+      activeTypeFilter = type;
+      const list = type ? allFiles.filter(f => f.type === type) : allFiles;
+      renderFiles(list);
+      document.querySelectorAll('.type-btn').forEach(b => {
+        b.style.opacity = (!type && b.textContent.startsWith('Tous')) || b.textContent.startsWith(type) ? '1' : '0.55';
+      });
+    }
+
+    const TYPE_ICONS = { auth:'🔐', syslog:'📋', kernel:'⚡', nginx:'🌐', apache:'🌐', mysql:'🗄️',
+      postgresql:'🐘', cron:'⏰', daemon:'⚙️', firewall:'🛡️', fail2ban:'🚫',
+      generic:'📄', boot:'🚀', mail:'📧', package:'📦', journal:'📒' };
+    const TYPE_BL = { auth:'border-red-800', syslog:'border-blue-800', kernel:'border-purple-800',
+      nginx:'border-green-800', apache:'border-green-700', mysql:'border-orange-800',
+      cron:'border-yellow-800', daemon:'border-cyan-800', firewall:'border-red-700',
+      fail2ban:'border-orange-700', generic:'border-gray-800' };
+
+    function renderFiles(files) {
+      const c = document.getElementById('logFilesList');
+      if (!files.length) {
+        c.innerHTML = '<div class="text-gray-700 text-xs text-center py-8">Aucun fichier</div>';
+        return;
+      }
+      c.innerHTML = files.map(f => {
+        const sel = selectedFiles.has(f.path);
+        const icon = TYPE_ICONS[f.type] || '📄';
+        const bl = TYPE_BL[f.type] || 'border-gray-800';
+        const locked = !f.readable;
+        const safePath = f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `
+          <div class="log-card flex items-center gap-2.5 px-3 py-2 rounded border-l-2 ${bl}
+                      ${sel ? 'selected' : ''} ${locked ? 'opacity-40' : 'cursor-pointer'}"
+               ${!locked ? `onclick="toggle('${safePath}')"` : ''}>
+            <input type="checkbox" class="flex-shrink-0 accent-cyan-500"
+                   ${sel ? 'checked' : ''} ${locked ? 'disabled' : ''}
+                   onchange="toggle('${safePath}'); event.stopPropagation()"
+                   onclick="event.stopPropagation()">
+            <span class="text-sm flex-shrink-0">${icon}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs text-gray-300 font-medium truncate">${escapeHtml(f.name)}</div>
+              <div class="text-xs text-gray-700 truncate">${escapeHtml(f.relPath)}</div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-xs text-gray-500">${formatSize(f.size)}</div>
+              <div class="text-xs text-gray-700">${formatDate(f.modified)}</div>
+            </div>
+            ${locked ? '<span class="text-red-600 text-xs" title="Permission refusée">🔒</span>' : ''}
+          </div>`;
+      }).join('');
+    }
+
+    function toggle(filePath) {
+      if (selectedFiles.has(filePath)) selectedFiles.delete(filePath);
+      else selectedFiles.add(filePath);
+      updateSelectedCount();
+      const list = activeTypeFilter ? allFiles.filter(f => f.type === activeTypeFilter) : allFiles;
+      renderFiles(list);
+    }
+
+    function selectAll() {
+      allFiles.filter(f => f.readable).forEach(f => selectedFiles.add(f.path));
+      updateSelectedCount();
+      const list = activeTypeFilter ? allFiles.filter(f => f.type === activeTypeFilter) : allFiles;
+      renderFiles(list);
+    }
+
+    function deselectAll() {
+      selectedFiles.clear();
+      updateSelectedCount();
+      const list = activeTypeFilter ? allFiles.filter(f => f.type === activeTypeFilter) : allFiles;
+      renderFiles(list);
+    }
+
+    function updateSelectedCount() {
+      const n = selectedFiles.size;
+      document.getElementById('selectedCount').textContent = n > 0 ? `(${n} sélectionné${n>1?'s':''})` : '';
+      document.getElementById('analyzeBtn').disabled = n === 0;
+    }
+
+    function launchAnalysis() {
+      if (!selectedFiles.size) return;
+      sessionStorage.setItem('veylog_selected_files', JSON.stringify(Array.from(selectedFiles)));
+      window.location.href = 'analyze.html';
+    }
+
+    // ── Historique ─────────────────────────────────────────────────────
+
+    async function loadHistory() {
+      try {
+        const history = await apiGet('/api/reports/history');
+        document.getElementById('statTotal').textContent = history.length;
+
+        if (history.length) {
+          const last = history[0];
+          document.getElementById('statLastDate').textContent = formatDate(last.timestamp);
+          const sevEl = document.getElementById('statLastSeverity');
+          sevEl.innerHTML = severityBadge(last.severity);
+
+          document.getElementById('historyList').innerHTML = history.slice(0, 6).map(h => `
+            <a href="report.html?id=${escapeHtml(h.id)}" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-800 transition-colors cursor-pointer">
+              <span class="severity-badge ${severityClass(h.severity)} text-xs px-1.5 py-0.5 rounded flex-shrink-0 font-bold">
+                ${(h.severity || '?').charAt(0)}
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="text-xs text-gray-400 truncate">${escapeHtml(h.summary || 'Analyse')}</div>
+                <div class="text-xs text-gray-700">${formatDate(h.timestamp)} · ${h.filesCount} fichier${h.filesCount>1?'s':''}</div>
+              </div>
+              <span class="text-xs text-gray-600 flex-shrink-0">${h.findingsCount || 0}</span>
+            </a>
+          `).join('');
+        } else {
+          document.getElementById('historyList').innerHTML =
+            '<div class="text-gray-700 text-xs text-center py-6">Aucune analyse</div>';
+        }
+      } catch { /* Ignorer */ }
+    }
+
+    init();
+  </script>
+</body>
+</html>

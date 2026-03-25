@@ -1,0 +1,44 @@
+services:
+  veylog:
+    build: .
+    container_name: veylog
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/log:/var/log:ro      # Logs du host en lecture seule
+      - ./config:/app/config      # Configuration et rapports persistants
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - PORT=3000
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    networks:
+      - veylog-net
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: veylog-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - veylog-net
+    # Décommenter pour activer le support GPU NVIDIA
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  ollama_data:
+    name: veylog_ollama_data
+
+networks:
+  veylog-net:
+    name: veylog-network

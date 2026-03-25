@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veylog — Rapport</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { font-family: 'JetBrains Mono', monospace; box-sizing: border-box; }
+    body { background: #0f1117; color: #d1d5db; }
+    ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: #0f1117; } ::-webkit-scrollbar-thumb { background: #2d3142; border-radius: 3px; }
+    .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; font-size: 13px; color: #9ca3af; cursor: pointer; transition: all 0.15s; text-decoration: none; }
+    .sidebar-item:hover { background: rgba(255,255,255,0.05); color: #e5e7eb; }
+    .sidebar-item.active { background: rgba(34,211,238,0.08); color: #22d3ee; border-left: 2px solid #22d3ee; padding-left: 10px; }
+    .panel { background: #141720; border: 1px solid #1e2330; border-radius: 8px; }
+    .panel-header { border-bottom: 1px solid #1e2330; padding: 10px 16px; }
+    .panel-accent-cyan  { border-left: 3px solid #22d3ee; }
+    .panel-accent-purple{ border-left: 3px solid #a78bfa; }
+    .panel-accent-green { border-left: 3px solid #22c55e; }
+    .panel-accent-red   { border-left: 3px solid #ef4444; }
+    .panel-accent-orange{ border-left: 3px solid #f97316; }
+    .btn-terminal { background: #1a1d24; border: 1px solid #374151; color: #9ca3af; padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+    .btn-terminal:hover { border-color: #22d3ee; color: #22d3ee; }
+    .btn-primary { background: rgba(34,211,238,0.08); border: 1px solid #22d3ee; color: #22d3ee; padding: 5px 14px; border-radius: 5px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+    .btn-primary:hover { background: rgba(34,211,238,0.18); }
+    .severity-badge { display: inline-block; border-radius: 4px; font-weight: 700; }
+    .severity-critique { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+    .severity-eleve    { background: rgba(249,115,22,0.12); color: #f97316; border: 1px solid rgba(249,115,22,0.3); }
+    .severity-moyen    { background: rgba(234,179,8,0.12);  color: #eab308; border: 1px solid rgba(234,179,8,0.3); }
+    .severity-faible   { background: rgba(34,197,94,0.12);  color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+    .severity-info     { background: rgba(129,140,248,0.12);color: #818cf8; border: 1px solid rgba(129,140,248,0.3); }
+    .severity-ok       { background: rgba(34,197,94,0.12);  color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+    .finding-card { cursor: pointer; }
+    .finding-card:hover { border-color: #374151 !important; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .status-dot.online  { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+    .status-dot.offline { background: #ef4444; }
+    .status-dot.checking{ background: #eab308; animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .toast { animation: slideIn 0.25s ease; }
+    @keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .modal-bg { background: rgba(0,0,0,0.75); backdrop-filter: blur(3px); }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+  <aside class="fixed left-0 top-0 h-full w-52 bg-[#0a0c12] border-r border-gray-900 z-40 flex flex-col">
+    <div class="p-4 border-b border-gray-900">
+      <div class="flex items-center gap-2.5">
+        <svg class="w-8 h-8 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <div class="text-cyan-400 font-bold text-sm tracking-widest">VEYLOG</div>
+          <div class="text-gray-600 text-xs">Log Analyzer</div>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 p-2 space-y-0.5 mt-1">
+      <a href="index.html" class="sidebar-item">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zM8 4a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H9a1 1 0 01-1-1V4zM15 3a1 1 0 00-1 1v12a1 1 0 001 1h2a1 1 0 001-1V4a1 1 0 00-1-1h-2z"/></svg>
+        Dashboard
+      </a>
+      <a href="analyze.html" class="sidebar-item">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+        Analyser
+      </a>
+      <a href="report.html" class="sidebar-item active">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd"/></svg>
+        Rapport
+      </a>
+      <a href="settings.html" class="sidebar-item">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+        Paramètres
+      </a>
+    </nav>
+    <div class="p-3 border-t border-gray-900">
+      <div class="flex items-center gap-2">
+        <span class="status-dot checking" id="ollamaStatusDot"></span>
+        <span class="text-xs text-gray-600" id="ollamaStatusText">Vérification...</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Contenu principal ──────────────────────────────────────────── -->
+  <main class="ml-52 flex-1 p-6" id="reportContent">
+
+    <!-- En-tête du rapport -->
+    <div class="mb-5 flex items-start justify-between">
+      <div>
+        <h1 class="text-lg font-bold text-white">Rapport d'analyse</h1>
+        <div class="flex items-center gap-2 mt-1 text-xs flex-wrap" id="reportMeta"></div>
+      </div>
+      <div class="flex gap-2 flex-shrink-0">
+        <button onclick="exportMarkdown()" class="btn-terminal flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+          Export Markdown
+        </button>
+        <a href="analyze.html" class="btn-primary flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+          </svg>
+          Nouvelle analyse
+        </a>
+      </div>
+    </div>
+
+    <!-- Résumé exécutif -->
+    <div class="panel panel-accent-cyan mb-5 p-5">
+      <div class="flex items-start gap-5">
+        <div class="flex-shrink-0">
+          <div class="text-xs text-gray-600 mb-2 tracking-wider">SÉVÉRITÉ GLOBALE</div>
+          <span class="severity-badge text-2xl px-5 py-2 rounded-lg" id="severityBadge">—</span>
+        </div>
+        <div class="flex-1">
+          <div class="text-xs text-gray-600 mb-1 tracking-wider">RÉSUMÉ EXÉCUTIF</div>
+          <p class="text-sm text-gray-300 leading-relaxed" id="reportSummary">Chargement...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistiques et graphique -->
+    <div class="grid grid-cols-4 gap-4 mb-5">
+      <div class="col-span-3">
+        <div class="panel panel-accent-orange p-4">
+          <div class="text-xs text-orange-400 font-semibold tracking-wider mb-3">DISTRIBUTION DES FINDINGS</div>
+          <div class="grid grid-cols-6 gap-3" id="statsGrid"></div>
+        </div>
+      </div>
+      <div class="panel p-4 flex flex-col items-center">
+        <div class="text-xs text-gray-600 tracking-wider mb-2">RÉPARTITION</div>
+        <canvas id="severityChart" width="140" height="140"></canvas>
+        <div class="mt-3 space-y-1 w-full" id="chartLegend"></div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-5">
+
+      <!-- Findings (colonne principale) -->
+      <div class="col-span-2 space-y-4">
+
+        <!-- Filtres findings -->
+        <div class="panel panel-accent-red">
+          <div class="panel-header flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-red-400 tracking-wider">FINDINGS DE SÉCURITÉ</span>
+              <span class="text-xs text-gray-600" id="findingsCount"></span>
+            </div>
+            <div class="flex gap-1.5">
+              <button onclick="filterFindings('CRITIQUE')" data-sev="CRITIQUE"
+                class="findings-filter-btn severity-badge severity-critique text-xs px-2 py-0.5">CRITIQUE</button>
+              <button onclick="filterFindings('ÉLEVÉ')" data-sev="ÉLEVÉ"
+                class="findings-filter-btn severity-badge severity-eleve text-xs px-2 py-0.5">ÉLEVÉ</button>
+              <button onclick="filterFindings('MOYEN')" data-sev="MOYEN"
+                class="findings-filter-btn severity-badge severity-moyen text-xs px-2 py-0.5">MOYEN</button>
+              <button onclick="filterFindings('FAIBLE')" data-sev="FAIBLE"
+                class="findings-filter-btn severity-badge severity-faible text-xs px-2 py-0.5">FAIBLE</button>
+              <button onclick="filterFindings(null)" class="btn-terminal text-xs">Tous</button>
+            </div>
+          </div>
+          <div class="p-3 space-y-2" id="findingsList">
+            <div class="text-gray-600 text-xs text-center py-10">Chargement des findings...</div>
+          </div>
+        </div>
+
+        <!-- Fichiers analysés -->
+        <div class="panel panel-accent-purple">
+          <div class="panel-header">
+            <span class="text-xs font-semibold text-purple-400 tracking-wider">FICHIERS ANALYSÉS</span>
+          </div>
+          <div class="p-3" id="fileResultsList"></div>
+        </div>
+
+      </div>
+
+      <!-- Colonne droite -->
+      <div class="space-y-4">
+
+        <!-- Checklist -->
+        <div class="panel panel-accent-green">
+          <div class="panel-header">
+            <span class="text-xs font-semibold text-green-400 tracking-wider">COUVERTURE CHECKLIST</span>
+          </div>
+          <div class="p-3 grid grid-cols-1 gap-1.5" id="checklistGrid">
+            <div class="text-gray-700 text-xs text-center py-4">Chargement...</div>
+          </div>
+        </div>
+
+        <!-- Recommandations -->
+        <div class="panel panel-accent-cyan">
+          <div class="panel-header">
+            <span class="text-xs font-semibold text-cyan-400 tracking-wider">RECOMMANDATIONS</span>
+          </div>
+          <div class="p-3 space-y-2" id="recommendationsList"></div>
+        </div>
+
+        <!-- Commandes suggérées -->
+        <div class="panel panel-accent-orange">
+          <div class="panel-header flex items-center justify-between">
+            <span class="text-xs font-semibold text-orange-400 tracking-wider">COMMANDES SUGGÉRÉES</span>
+          </div>
+          <div class="p-3 space-y-1.5" id="commandsList"></div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Modal détail finding ──────────────────────────────────────── -->
+  <div id="findingModal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 modal-bg"
+       onclick="if(event.target===this) closeFindingModal()">
+    <div class="panel w-full max-w-2xl max-h-[85vh] flex flex-col" onclick="event.stopPropagation()">
+      <!-- Header modal -->
+      <div class="panel-header flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span id="modalSeverity"></span>
+          <span class="text-xs text-gray-500 font-mono" id="modalCategory"></span>
+        </div>
+        <button onclick="closeFindingModal()" class="text-gray-600 hover:text-gray-300 text-lg leading-none">✕</button>
+      </div>
+
+      <!-- Corps modal -->
+      <div class="overflow-y-auto flex-1 p-5 space-y-4">
+        <h2 class="text-base font-bold text-white" id="modalTitle"></h2>
+
+        <div>
+          <div class="text-xs text-gray-600 mb-1 tracking-wider">DESCRIPTION</div>
+          <p class="text-sm text-gray-300 leading-relaxed" id="modalDescription"></p>
+        </div>
+
+        <div id="modalEvidenceBlock">
+          <div class="text-xs text-gray-600 mb-1 tracking-wider">PREUVES (LIGNES DE LOGS)</div>
+          <div class="bg-gray-950 border border-gray-800 rounded p-3 space-y-1 max-h-48 overflow-y-auto" id="modalEvidence"></div>
+        </div>
+
+        <div>
+          <div class="text-xs text-gray-600 mb-1 tracking-wider">RECOMMANDATION</div>
+          <div class="bg-gray-900 border border-gray-800 rounded p-3 text-sm text-cyan-300" id="modalRecommendation"></div>
+        </div>
+      </div>
+
+      <div class="panel-header flex justify-end">
+        <button onclick="closeFindingModal()" class="btn-terminal">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fixed bottom-4 right-4 space-y-2 z-50" id="toastContainer"></div>
+
+  <script src="js/app.js"></script>
+  <script src="js/report.js"></script>
+</body>
+</html>
