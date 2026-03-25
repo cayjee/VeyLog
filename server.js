@@ -1,6 +1,6 @@
 /**
  * Veylog — Serveur Backend
- * Analyseur de logs Linux propulsé par LLM local via Ollama
+ * Analyseur de logs Linux — supporte Ollama, OpenAI, Gemini et Claude
  * Architecture : Node.js 20 + Express 4
  */
 
@@ -20,10 +20,18 @@ const CONFIG_PATH = '/app/config/settings.json';
 // ─── Configuration par défaut ────────────────────────────────────────────────
 
 const DEFAULT_CONFIG = {
-  logsPath: process.env.LOGS_PATH || '/var/log',
-  ollamaUrl: process.env.OLLAMA_URL || 'http://ollama:11434',
-  defaultModel: process.env.DEFAULT_MODEL || 'llama3.3:70b',
-  maxLines: parseInt(process.env.MAX_LINES) || 300,
+  logsPath:      process.env.LOGS_PATH     || '/var/log',
+  ollamaUrl:     process.env.OLLAMA_URL    || 'http://ollama:11434',
+  defaultModel:  process.env.DEFAULT_MODEL || 'llama3.3:70b',
+  maxLines:      parseInt(process.env.MAX_LINES) || 300,
+  // Provider LLM : 'ollama' | 'openai' | 'gemini' | 'claude'
+  llmProvider:   process.env.LLM_PROVIDER  || 'ollama',
+  openaiApiKey:  process.env.OPENAI_API_KEY  || '',
+  openaiModel:   process.env.OPENAI_MODEL    || 'gpt-4o',
+  geminiApiKey:  process.env.GEMINI_API_KEY  || '',
+  geminiModel:   process.env.GEMINI_MODEL    || 'gemini-2.0-flash',
+  claudeApiKey:  process.env.CLAUDE_API_KEY  || '',
+  claudeModel:   process.env.CLAUDE_MODEL    || 'claude-sonnet-4-6',
 };
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -112,6 +120,118 @@ function ollamaRequest(urlStr, method = 'GET', body = null, timeoutMs = 120000) 
     req.end();
   });
 }
+
+// ─── Clients LLM ─────────────────────────────────────────────────────────────
+
+/**
+ * Appeler l'API OpenAI (ChatGPT).
+ */
+async function callOpenAI(prompt, apiKey, model) {
+  if (!apiKey) throw new Error('Clé API OpenAI non configurée dans les paramètres');
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.1 }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`OpenAI ${res.status}: ${err.error?.message || res.statusText}`);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+/**
+ * Appeler l'API Google Gemini.
+ */
+async function callGemini(prompt, apiKey, model) {
+  if (!apiKey) throw new Error('Clé API Gemini non configurée dans les paramètres');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1 },
+    }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Gemini ${res.status}: ${err.error?.message || res.statusText}`);
+  }
+  const data = await res.json();
+  return data.candidates[0].content.parts[0].text;
+}
+
+/**
+ * Appeler l'API Anthropic Claude.
+ */
+async function callClaude(prompt, apiKey, model) {
+  if (!apiKey) throw new Error('Clé API Claude non configurée dans les paramètres');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model, max_tokens: 8192, messages: [{ role: 'user', content: prompt }] }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Claude ${res.status}: ${err.error?.message || res.statusText}`);
+  }
+  const data = await res.json();
+  return data.content[0].text;
+}
+
+/**
+ * Appeler Ollama en local.
+ */
+async function callOllama(prompt, ollamaUrl, model) {
+  const result = await ollamaRequest(`${ollamaUrl}/api/generate`, 'POST', {
+    model, prompt, stream: false, options: { temperature: 0.1, num_predict: 8000 },
+  }, 360000);
+  if (result.status !== 200) throw new Error(`Ollama a retourné le statut ${result.status}`);
+  return result.data.response || '';
+}
+
+/**
+ * Dispatcher LLM — route vers le bon provider selon la configuration.
+ * @param {string} prompt - Prompt complet
+ * @param {object} config - Configuration chargée
+ * @param {string} [model] - Modèle à utiliser (override)
+ */
+async function callLLM(prompt, config, model) {
+  const provider = config.llmProvider || 'ollama';
+  if (provider === 'openai') return callOpenAI(prompt, config.openaiApiKey, model || config.openaiModel);
+  if (provider === 'gemini') return callGemini(prompt, config.geminiApiKey, model || config.geminiModel);
+  if (provider === 'claude') return callClaude(prompt, config.claudeApiKey, model || config.claudeModel);
+  return callOllama(prompt, config.ollamaUrl, model || config.defaultModel);
+}
+
+// Modèles disponibles par provider cloud
+const PROVIDER_MODELS = {
+  openai: [
+    { name: 'gpt-4o',      description: 'Recommandé — meilleur rapport qualité/prix' },
+    { name: 'gpt-4o-mini', description: 'Rapide et économique' },
+    { name: 'gpt-4-turbo', description: 'Contexte 128k tokens' },
+    { name: 'o1',          description: 'Raisonnement avancé' },
+  ],
+  gemini: [
+    { name: 'gemini-2.0-flash', description: 'Recommandé — rapide et performant' },
+    { name: 'gemini-1.5-pro',   description: 'Contexte 1M tokens' },
+    { name: 'gemini-1.5-flash', description: 'Économique' },
+  ],
+  claude: [
+    { name: 'claude-sonnet-4-6',          description: 'Recommandé — équilibré performance/coût' },
+    { name: 'claude-opus-4-6',            description: 'Meilleure capacité d\'analyse' },
+    { name: 'claude-haiku-4-5-20251001',  description: 'Rapide et économique' },
+  ],
+};
 
 // ─── Helpers fichiers logs ────────────────────────────────────────────────────
 
@@ -373,23 +493,30 @@ function updateHistory(reportId, report, files) {
 // ─── Routes API ───────────────────────────────────────────────────────────────
 
 /**
- * GET /api/health — Statut du serveur et d'Ollama
+ * GET /api/health — Statut du serveur et du provider LLM
  */
 app.get('/api/health', async (req, res) => {
   const config = loadConfig();
-  let ollamaStatus = 'disconnected';
-  let ollamaVersion = null;
+  const provider = config.llmProvider || 'ollama';
+  let llmStatus = 'disconnected';
 
-  try {
-    const result = await ollamaRequest(`${config.ollamaUrl}/api/tags`, 'GET', null, 5000);
-    if (result.status === 200) {
-      ollamaStatus = 'connected';
-    }
-  } catch { /* Ollama inaccessible */ }
+  if (provider === 'ollama') {
+    try {
+      const result = await ollamaRequest(`${config.ollamaUrl}/api/tags`, 'GET', null, 5000);
+      if (result.status === 200) llmStatus = 'connected';
+    } catch { /* Ollama inaccessible */ }
+  } else {
+    // Pour les providers cloud, vérifier que la clé API est configurée
+    const keyMap = { openai: 'openaiApiKey', gemini: 'geminiApiKey', claude: 'claudeApiKey' };
+    llmStatus = config[keyMap[provider]] ? 'configured' : 'no_key';
+  }
 
   res.json({
     status: 'ok',
-    ollama: ollamaStatus,
+    llmProvider: provider,
+    llmStatus,
+    // Rétrocompatibilité
+    ollama: provider === 'ollama' ? llmStatus : 'disabled',
     ollamaUrl: config.ollamaUrl,
     version: '1.0.0',
     timestamp: new Date().toISOString(),
@@ -451,7 +578,7 @@ app.get('/api/logs/read', (req, res) => {
 });
 
 /**
- * GET /api/ollama/models — Liste des modèles Ollama disponibles
+ * GET /api/ollama/models — Rétrocompatibilité (redirige vers /api/llm/models)
  */
 app.get('/api/ollama/models', async (req, res) => {
   const config = loadConfig();
@@ -468,6 +595,29 @@ app.get('/api/ollama/models', async (req, res) => {
 });
 
 /**
+ * GET /api/llm/models — Liste des modèles selon le provider actif
+ */
+app.get('/api/llm/models', async (req, res) => {
+  const config = loadConfig();
+  const provider = config.llmProvider || 'ollama';
+
+  if (provider === 'ollama') {
+    try {
+      const result = await ollamaRequest(`${config.ollamaUrl}/api/tags`, 'GET', null, 10000);
+      if (result.status === 200) {
+        res.json({ provider, models: result.data.models || [] });
+      } else {
+        res.status(result.status).json({ error: 'Réponse inattendue d\'Ollama' });
+      }
+    } catch (e) {
+      res.status(503).json({ error: `Ollama inaccessible : ${e.message}` });
+    }
+  } else {
+    res.json({ provider, models: PROVIDER_MODELS[provider] || [] });
+  }
+});
+
+/**
  * GET /api/settings — Lire la configuration courante
  */
 app.get('/api/settings', (req, res) => {
@@ -480,7 +630,13 @@ app.get('/api/settings', (req, res) => {
 app.post('/api/settings', (req, res) => {
   const current = loadConfig();
   // Valider et filtrer les champs acceptés
-  const allowed = ['logsPath', 'ollamaUrl', 'defaultModel', 'maxLines'];
+  const allowed = [
+    'logsPath', 'ollamaUrl', 'defaultModel', 'maxLines',
+    'llmProvider',
+    'openaiApiKey', 'openaiModel',
+    'geminiApiKey', 'geminiModel',
+    'claudeApiKey', 'claudeModel',
+  ];
   const updates = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -590,43 +746,32 @@ app.post('/api/analyze', async (req, res) => {
     return res.status(400).json({ error: 'Aucun fichier lisible parmi la sélection', fileResults });
   }
 
-  // ── Étape 2 : Construire le prompt et appeler Ollama ──────────────────────
+  // ── Étape 2 : Construire le prompt et appeler le LLM ─────────────────────
 
   const prompt = buildAnalysisPrompt(logChunks, selectedTasks);
-  const chosenModel = model || config.defaultModel;
+  const provider = config.llmProvider || 'ollama';
+  const modelDefaults = {
+    ollama: config.defaultModel,
+    openai: config.openaiModel,
+    gemini: config.geminiModel,
+    claude: config.claudeModel,
+  };
+  const chosenModel = model || modelDefaults[provider] || config.defaultModel;
 
-  console.log(`[Analyse] Modèle : ${chosenModel}, fichiers : ${logChunks.length}, tâches : ${selectedTasks.length}`);
+  console.log(`[Analyse] Provider : ${provider}, Modèle : ${chosenModel}, fichiers : ${logChunks.length}, tâches : ${selectedTasks.length}`);
 
-  let ollamaResult;
+  let rawResponse;
   try {
-    ollamaResult = await ollamaRequest(
-      `${config.ollamaUrl}/api/generate`,
-      'POST',
-      {
-        model: chosenModel,
-        prompt,
-        stream: false,
-        options: { temperature: 0.1, num_predict: 8000 },
-      },
-      360000 // 6 minutes max pour les gros modèles
-    );
+    rawResponse = await callLLM(prompt, config, chosenModel);
   } catch (e) {
     return res.status(503).json({
-      error: `Erreur de communication avec Ollama : ${e.message}`,
-      fileResults,
-    });
-  }
-
-  if (ollamaResult.status !== 200) {
-    return res.status(502).json({
-      error: `Ollama a retourné le statut ${ollamaResult.status}`,
+      error: `Erreur LLM (${provider}) : ${e.message}`,
       fileResults,
     });
   }
 
   // ── Étape 3 : Parser la réponse JSON du LLM ───────────────────────────────
 
-  const rawResponse = ollamaResult.data.response || '';
   let report;
 
   try {

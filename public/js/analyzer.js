@@ -217,30 +217,45 @@ function updateSelectionCount() {
   if (el) el.textContent = `${count} fichier${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''}`;
 }
 
-// ─── Chargement des modèles Ollama ────────────────────────────────────────────
+// ─── Chargement des modèles (provider-aware) ──────────────────────────────────
 
 async function loadModels() {
   const select = document.getElementById('modelSelect');
   if (!select) return;
 
   try {
-    const settings = await apiGet('/api/settings');
-    const data = await apiGet('/api/ollama/models');
-    state.availableModels = data.models || [];
+    const [settings, data] = await Promise.all([
+      apiGet('/api/settings'),
+      apiGet('/api/llm/models'),
+    ]);
+    const provider = data.provider || 'ollama';
+    const models = data.models || [];
+    state.availableModels = models;
 
-    if (!state.availableModels.length) {
-      select.innerHTML = '<option value="">Aucun modèle disponible</option>';
-      showToast('Aucun modèle Ollama — lancez : ollama pull llama3.3:70b', 'warn', 6000);
+    if (!models.length) {
+      select.innerHTML = provider === 'ollama'
+        ? '<option value="">Aucun modèle Ollama — lancez : ollama pull llama3.3:70b</option>'
+        : '<option value="">Aucun modèle disponible</option>';
+      if (provider === 'ollama') showToast('Aucun modèle Ollama disponible', 'warn', 6000);
       return;
     }
 
-    select.innerHTML = state.availableModels.map(m =>
-      `<option value="${escapeHtml(m.name)}" ${m.name === settings.defaultModel ? 'selected' : ''}>
-        ${escapeHtml(m.name)} (${formatSize(m.size || 0)})
-      </option>`
-    ).join('');
+    if (provider === 'ollama') {
+      select.innerHTML = models.map(m =>
+        `<option value="${escapeHtml(m.name)}" ${m.name === settings.defaultModel ? 'selected' : ''}>
+          ${escapeHtml(m.name)} (${formatSize(m.size || 0)})
+        </option>`
+      ).join('');
+    } else {
+      const defaultModel = settings[`${provider}Model`] || models[0]?.name;
+      select.innerHTML = models.map(m =>
+        `<option value="${escapeHtml(m.name)}" ${m.name === defaultModel ? 'selected' : ''}>
+          ${escapeHtml(m.name)}${m.description ? ' — ' + escapeHtml(m.description) : ''}
+        </option>`
+      ).join('');
+    }
   } catch (e) {
-    if (select) select.innerHTML = `<option value="">Ollama inaccessible</option>`;
+    if (select) select.innerHTML = `<option value="">LLM inaccessible</option>`;
   }
 }
 
@@ -305,7 +320,7 @@ async function launchAnalysis() {
 
   if (!files.length) { showToast('Sélectionnez au moins un fichier', 'warn'); return; }
   if (!tasks.length) { showToast('Sélectionnez au moins une tâche', 'warn'); return; }
-  if (!model) { showToast('Sélectionnez un modèle Ollama', 'warn'); return; }
+  if (!model) { showToast('Sélectionnez un modèle', 'warn'); return; }
 
   state.isAnalyzing = true;
   updateAnalyzeButton();

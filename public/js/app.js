@@ -171,32 +171,42 @@ function showToast(message, type = 'info', duration = 4000) {
   }
 }
 
-// ─── Statut Ollama sidebar ────────────────────────────────────────────────────
+// ─── Statut LLM sidebar ──────────────────────────────────────────────────────
+
+const LLM_PROVIDER_NAMES = { ollama: 'Ollama', openai: 'OpenAI', gemini: 'Gemini', claude: 'Claude' };
 
 /**
- * Vérifier et afficher le statut Ollama dans la sidebar.
+ * Vérifier et afficher le statut du provider LLM dans la sidebar.
  */
-async function checkOllamaStatus() {
+async function checkLLMStatus() {
   const dot = document.getElementById('ollamaStatusDot');
   const text = document.getElementById('ollamaStatusText');
   if (!dot) return;
 
   try {
     const data = await apiGet('/api/health');
-    if (data.ollama === 'connected') {
+    const name = LLM_PROVIDER_NAMES[data.llmProvider] || data.llmProvider || 'LLM';
+
+    if (data.llmStatus === 'connected' || data.llmStatus === 'configured') {
       dot.className = 'status-dot online';
-      if (text) text.textContent = 'Ollama connecté';
+      if (text) text.textContent = `${name} ✓`;
+    } else if (data.llmStatus === 'no_key') {
+      dot.className = 'status-dot offline';
+      if (text) text.textContent = `${name} — clé manquante`;
     } else {
       dot.className = 'status-dot offline';
-      if (text) text.textContent = 'Ollama hors ligne';
+      if (text) text.textContent = `${name} hors ligne`;
     }
-    return data.ollama === 'connected';
+    return data.llmStatus === 'connected' || data.llmStatus === 'configured';
   } catch {
     if (dot) dot.className = 'status-dot offline';
     if (text) text.textContent = 'Erreur connexion';
     return false;
   }
 }
+
+// Alias pour rétrocompatibilité
+const checkOllamaStatus = checkLLMStatus;
 
 // ─── Sécurité HTML ────────────────────────────────────────────────────────────
 
@@ -323,8 +333,8 @@ function downloadText(content, filename) {
 
 // ─── Init commune ─────────────────────────────────────────────────────────────
 
-// Vérifier le statut Ollama au chargement + toutes les 30 secondes
+// Vérifier le statut LLM au chargement + toutes les 30 secondes
 document.addEventListener('DOMContentLoaded', () => {
-  checkOllamaStatus();
-  setInterval(checkOllamaStatus, 30000);
+  checkLLMStatus();
+  setInterval(checkLLMStatus, 30000);
 });
