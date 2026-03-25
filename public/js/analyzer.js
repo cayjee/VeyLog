@@ -113,6 +113,8 @@ function renderTypeFilters() {
 
 function filterByType(type) {
   state.activeTypeFilter = type;
+  const searchEl = document.getElementById('fileSearch');
+  if (searchEl) searchEl.value = '';
   const filtered = type ? state.files.filter(f => f.type === type) : state.files;
   renderFileTree(filtered);
 
@@ -175,6 +177,17 @@ function renderFileTree(files) {
         ${locked ? '<span class="text-xs text-red-500 flex-shrink-0" title="Permission refusée">🔒</span>' : ''}
       </div>`;
   }).join('');
+}
+
+function onFileSearch() {
+  const query = (document.getElementById('fileSearch')?.value || '').toLowerCase().trim();
+  const base = state.activeTypeFilter
+    ? state.files.filter(f => f.type === state.activeTypeFilter)
+    : state.files;
+  const filtered = query
+    ? base.filter(f => f.name.toLowerCase().includes(query) || f.relPath.toLowerCase().includes(query))
+    : base;
+  renderFileTree(filtered);
 }
 
 function toggleFile(filePath) {
