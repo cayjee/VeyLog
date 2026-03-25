@@ -26,13 +26,6 @@ services:
     restart: unless-stopped
     networks:
       - veylog-net
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
 
 volumes:
   ollama_data:
