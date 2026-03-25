@@ -3,7 +3,7 @@ services:
     build: .
     container_name: veylog
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - /var/log:/var/log:ro      # Logs du host en lecture seule
       - ./config:/app/config      # Configuration et rapports persistants

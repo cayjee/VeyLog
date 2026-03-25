@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veylog — Connexion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { font-family: 'JetBrains Mono', monospace; box-sizing: border-box; }
+    body { background: #0f1117; color: #d1d5db; }
+    .form-input { background: #1a1d24; border: 1px solid #2d3142; color: #e5e7eb; border-radius: 6px; padding: 10px 14px; font-size: 13px; width: 100%; outline: none; transition: border-color 0.15s; }
+    .form-input:focus { border-color: #22d3ee; }
+    .btn-primary { background: rgba(34,211,238,0.08); border: 1px solid #22d3ee; color: #22d3ee; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; width: 100%; }
+    .btn-primary:hover { background: rgba(34,211,238,0.18); }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+
+  <div class="w-full max-w-sm px-4">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="flex items-center justify-center gap-3 mb-2">
+        <svg class="w-10 h-10 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="text-cyan-400 font-bold text-2xl tracking-widest">VEYLOG</span>
+      </div>
+      <p class="text-gray-600 text-xs">Linux Log Analyzer</p>
+    </div>
+
+    <!-- Card -->
+    <div class="bg-[#141720] border border-[#1e2330] rounded-xl p-8 space-y-5">
+      <h1 class="text-sm font-semibold text-center text-gray-400 tracking-wider uppercase">Connexion</h1>
+
+      <div id="errorMsg" class="hidden bg-red-900/30 border border-red-800 rounded px-4 py-2 text-red-400 text-xs"></div>
+
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-600 uppercase tracking-wider mb-1.5 block">Mot de passe</label>
+          <input id="password" type="password" class="form-input" placeholder="••••••••"
+                 autocomplete="current-password" autofocus>
+        </div>
+        <button type="submit" class="btn-primary">
+          Se connecter
+        </button>
+      </form>
+    </div>
+
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const password = document.getElementById('password').value;
+      const errEl    = document.getElementById('errorMsg');
+      errEl.classList.add('hidden');
+
+      try {
+        const r    = await fetch('/api/auth/login', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ password }),
+        });
+        const data = await r.json();
+        if (data.ok) {
+          localStorage.setItem('veylog_token', data.token || '');
+          window.location.href = '/';
+        } else {
+          errEl.textContent = data.error || 'Mot de passe incorrect';
+          errEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errEl.textContent = 'Erreur de connexion : ' + err.message;
+        errEl.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

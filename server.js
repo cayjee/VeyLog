@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const crypto = require('crypto');
 const { URL } = require('url');
 
 const app = express();
@@ -18,6 +19,9 @@ const PORT = process.env.PORT || 3000;
 const CONFIG_PATH = '/app/config/settings.json';
 
 // ─── Configuration par défaut ────────────────────────────────────────────────
+
+// Sessions auth en mémoire
+const sessions = new Set();
 
 const DEFAULT_CONFIG = {
   logsPath:      process.env.LOGS_PATH     || '/var/log',
@@ -32,6 +36,9 @@ const DEFAULT_CONFIG = {
   geminiModel:   process.env.GEMINI_MODEL    || 'gemini-2.0-flash',
   claudeApiKey:  process.env.CLAUDE_API_KEY  || '',
   claudeModel:   process.env.CLAUDE_MODEL    || 'claude-sonnet-4-6',
+  // Auth
+  authEnabled:  process.env.AUTH_ENABLED === 'true' || false,
+  authPassword: process.env.AUTH_PASSWORD || '',
 };
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -490,6 +497,44 @@ function updateHistory(reportId, report, files) {
   fs.writeFileSync(histPath, JSON.stringify(history, null, 2));
 }
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+function authMiddleware(req, res, next) {
+  const config = loadConfig();
+  if (!config.authEnabled) return next();
+  if (['/auth/login', '/auth/check', '/auth/logout'].includes(req.path)) return next();
+  const token = req.headers['x-auth-token'] || '';
+  if (!token || !sessions.has(token)) return res.status(401).json({ error: 'Non autorisé' });
+  next();
+}
+
+app.use('/api', authMiddleware);
+
+app.get('/api/auth/check', (req, res) => {
+  const config = loadConfig();
+  if (!config.authEnabled) return res.json({ authRequired: false, ok: true });
+  const token = req.headers['x-auth-token'] || '';
+  res.json({ authRequired: true, ok: sessions.has(token) });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const config = loadConfig();
+  if (!config.authEnabled) return res.json({ ok: true, token: '' });
+  const { password } = req.body;
+  if (!password || password !== config.authPassword) {
+    return res.status(401).json({ error: 'Mot de passe incorrect' });
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.add(token);
+  res.json({ ok: true, token });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = req.headers['x-auth-token'] || '';
+  sessions.delete(token);
+  res.json({ ok: true });
+});
+
 // ─── Routes API ───────────────────────────────────────────────────────────────
 
 /**
@@ -636,6 +681,7 @@ app.post('/api/settings', (req, res) => {
     'openaiApiKey', 'openaiModel',
     'geminiApiKey', 'geminiModel',
     'claudeApiKey', 'claudeModel',
+    'authEnabled', 'authPassword',
   ];
   const updates = {};
   for (const key of allowed) {
