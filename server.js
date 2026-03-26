@@ -200,7 +200,7 @@ async function callClaude(prompt, apiKey, model) {
  */
 async function callOllama(prompt, ollamaUrl, model) {
   const result = await ollamaRequest(`${ollamaUrl}/api/generate`, 'POST', {
-    model, prompt, stream: false, options: { temperature: 0.1, num_predict: 8000 },
+    model, prompt, stream: false, options: { temperature: 0.1, num_predict: 16000 },
   }, 360000);
   if (result.status !== 200) throw new Error(`Ollama a retourné le statut ${result.status}`);
   return result.data.response || '';
