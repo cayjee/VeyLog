@@ -537,7 +537,6 @@ Réponds UNIQUEMENT avec ce JSON valide (aucun markdown autour) :
 // ─── Fusion des résultats multi-tâches ────────────────────────────────────────
 
 function mergeTaskResults(taskResults, logChunks) {
-  const allFindings = [];
   const checklistCoverage = {};
   let suspicious = 0, warnings = 0, errors = 0;
 
@@ -575,7 +574,6 @@ function mergeTaskResults(taskResults, logChunks) {
     else errors++;
   });
 
-  const severityOrder = ['CRITIQUE', 'ÉLEVÉ', 'MOYEN', 'FAIBLE', 'INFO', 'OK'];
   let severityGlobal = 'OK';
   for (const f of allFindings) {
     if (severityOrder.indexOf(f.severity) < severityOrder.indexOf(severityGlobal)) {
