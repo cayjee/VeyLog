@@ -565,13 +565,23 @@ function mergeTaskResults(taskResults, logChunks) {
     ? `Analyse complète : ${allFindings.length} finding(s) détecté(s) (${critiques} critique(s), ${eleves} élevé(s)). Sévérité globale : ${severityGlobal}.`
     : 'Aucun problème de sécurité détecté dans les logs analysés.';
 
+  // Extraire les recommandations uniques depuis les findings
+  const seen = new Set();
+  const recommendations = [];
+  for (const f of allFindings) {
+    if (f.recommendation && !seen.has(f.recommendation)) {
+      seen.add(f.recommendation);
+      recommendations.push(f.recommendation);
+    }
+  }
+
   return {
     summary,
     severity_global: severityGlobal,
     statistics: { errors, warnings, suspicious, total_analyzed: totalLines },
     findings: allFindings,
     checklist_coverage: checklistCoverage,
-    recommendations: [],
+    recommendations,
     commands_suggested: [],
   };
 }
