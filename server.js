@@ -405,6 +405,19 @@ const TASK_DESCRIPTIONS = {
   task10: 'Services web : erreurs 4xx/5xx massives, injection SQL/XSS, scans de vulnérabilités',
 };
 
+const TASK_CATEGORIES = {
+  task1: 'Authentification',
+  task2: 'Système',
+  task3: 'Réseau',
+  task4: 'Système',
+  task5: 'Système',
+  task6: 'Réseau',
+  task7: 'Intégrité',
+  task8: 'Malware',
+  task9: 'Ressources',
+  task10: 'Web',
+};
+
 /**
  * Construire le prompt complet envoyé à Ollama.
  */
@@ -413,6 +426,9 @@ function buildAnalysisPrompt(logChunks, selectedTasks) {
     .map(t => `  - [${t}] ${TASK_DESCRIPTIONS[t] || t}`)
     .join('\n');
 
+  const allowedCategories = [...new Set(selectedTasks.map(t => TASK_CATEGORIES[t]).filter(Boolean))];
+  const categoriesStr = allowedCategories.join('|');
+
   const logsBlock = logChunks
     .map(c =>
       `=== FICHIER : ${c.file} | TYPE : ${c.type} | ${c.filteredLines}/${c.totalLines} lignes ===\n${c.content}`
@@ -420,16 +436,20 @@ function buildAnalysisPrompt(logChunks, selectedTasks) {
     .join('\n\n');
 
   return `Tu es Veylog, expert senior en sécurité Linux et analyse forensique de logs.
-Analyse les logs ci-dessous et génère un rapport de sécurité complet.
+Analyse les logs ci-dessous et génère un rapport de sécurité strictement limité aux tâches demandées.
 
 TÂCHES À COUVRIR :
 ${tasksBlock}
+
+CONTRAINTE STRICTE : Tu dois UNIQUEMENT rapporter des findings liés aux tâches listées ci-dessus.
+N'inclus AUCUN finding hors de ce périmètre, même si tu détectes d'autres problèmes dans les logs.
+Les catégories autorisées pour les findings sont : ${categoriesStr}
 
 LOGS À ANALYSER :
 ${logsBlock}
 
 INSTRUCTIONS :
-- Identifie TOUS les problèmes, même mineurs
+- Identifie les problèmes liés aux tâches sélectionnées uniquement
 - Pour chaque finding, cite les lignes exactes comme preuves (champ "evidence")
 - Sévérités : CRITIQUE (exploitation active/confirmée), ÉLEVÉ (risque important), MOYEN (risque modéré), FAIBLE (best practice), INFO (informatif)
 - Propose des commandes shell précises et applicables
@@ -448,7 +468,7 @@ Réponds UNIQUEMENT avec ce JSON valide (aucun markdown, aucune explication auto
   "findings": [
     {
       "severity": "CRITIQUE|ÉLEVÉ|MOYEN|FAIBLE|INFO",
-      "category": "Authentification|Réseau|Système|Malware|Web|Ressources|Intégrité",
+      "category": "${categoriesStr}",
       "title": "Titre court et précis",
       "description": "Description détaillée du problème",
       "evidence": ["ligne de log exacte 1", "ligne de log exacte 2"],
