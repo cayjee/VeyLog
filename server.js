@@ -489,6 +489,93 @@ Réponds UNIQUEMENT avec ce JSON valide (aucun markdown, aucune explication auto
 }`;
 }
 
+// ─── Prompt focalisé sur une seule tâche ─────────────────────────────────────
+
+function buildTaskPrompt(logChunks, task) {
+  const taskDesc = TASK_DESCRIPTIONS[task] || task;
+  const category = TASK_CATEGORIES[task] || 'Système';
+
+  const logsBlock = logChunks
+    .map(c =>
+      `=== FICHIER : ${c.file} | TYPE : ${c.type} | ${c.filteredLines}/${c.totalLines} lignes ===\n${c.content}`
+    )
+    .join('\n\n');
+
+  return `Tu es Veylog, expert senior en sécurité Linux et analyse forensique de logs.
+
+TÂCHE UNIQUE : ${taskDesc}
+
+LOGS À ANALYSER :
+${logsBlock}
+
+INSTRUCTIONS :
+- Concentre-toi EXCLUSIVEMENT sur : ${taskDesc}
+- Sois EXHAUSTIF : examine chaque ligne, signale TOUT indice même subtil
+- Ne passe à la ligne suivante qu'après l'avoir analysée en profondeur
+- Cite les lignes exactes comme preuves (champ "evidence")
+- Sévérités : CRITIQUE (exploitation active), ÉLEVÉ (risque important), MOYEN (risque modéré), FAIBLE (best practice), INFO (informatif)
+- Si aucun problème trouvé, retourne findings vide
+
+Réponds UNIQUEMENT avec ce JSON valide (aucun markdown autour) :
+{
+  "findings": [
+    {
+      "severity": "CRITIQUE|ÉLEVÉ|MOYEN|FAIBLE|INFO",
+      "category": "${category}",
+      "title": "Titre court et précis",
+      "description": "Description détaillée",
+      "evidence": ["ligne exacte 1", "ligne exacte 2"],
+      "recommendation": "Action corrective concrète"
+    }
+  ],
+  "covered": true,
+  "notes": "Résumé de ce qui a été analysé pour cette tâche"
+}`;
+}
+
+// ─── Fusion des résultats multi-tâches ────────────────────────────────────────
+
+function mergeTaskResults(taskResults, logChunks) {
+  const allFindings = [];
+  const checklistCoverage = {};
+  let suspicious = 0, warnings = 0, errors = 0;
+
+  for (const { task, result } of taskResults) {
+    if (Array.isArray(result.findings)) allFindings.push(...result.findings);
+    checklistCoverage[task] = { covered: result.covered !== false, notes: result.notes || '' };
+    (result.findings || []).forEach(f => {
+      if (f.severity === 'CRITIQUE' || f.severity === 'ÉLEVÉ') suspicious++;
+      else if (f.severity === 'MOYEN') warnings++;
+      else errors++;
+    });
+  }
+
+  const severityOrder = ['CRITIQUE', 'ÉLEVÉ', 'MOYEN', 'FAIBLE', 'INFO', 'OK'];
+  let severityGlobal = 'OK';
+  for (const f of allFindings) {
+    if (severityOrder.indexOf(f.severity) < severityOrder.indexOf(severityGlobal)) {
+      severityGlobal = f.severity;
+    }
+  }
+
+  const totalLines = logChunks.reduce((sum, c) => sum + c.filteredLines, 0);
+  const critiques = allFindings.filter(f => f.severity === 'CRITIQUE').length;
+  const eleves    = allFindings.filter(f => f.severity === 'ÉLEVÉ').length;
+  const summary   = allFindings.length
+    ? `Analyse complète : ${allFindings.length} finding(s) détecté(s) (${critiques} critique(s), ${eleves} élevé(s)). Sévérité globale : ${severityGlobal}.`
+    : 'Aucun problème de sécurité détecté dans les logs analysés.';
+
+  return {
+    summary,
+    severity_global: severityGlobal,
+    statistics: { errors, warnings, suspicious, total_analyzed: totalLines },
+    findings: allFindings,
+    checklist_coverage: checklistCoverage,
+    recommendations: [],
+    commands_suggested: [],
+  };
+}
+
 // ─── Historique des analyses ──────────────────────────────────────────────────
 
 function updateHistory(reportId, report, files) {
@@ -887,6 +974,142 @@ app.post('/api/analyze', async (req, res) => {
     report,
     timestamp: new Date().toISOString(),
   });
+});
+
+/**
+ * POST /api/analyze/stream — Analyse tâche par tâche avec progression SSE
+ * Body: { files: string[], model: string, tasks: string[] }
+ */
+app.post('/api/analyze/stream', async (req, res) => {
+  const { files, model, tasks } = req.body;
+  const config = loadConfig();
+
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: 'Aucun fichier sélectionné' });
+  }
+
+  const selectedTasks = Array.isArray(tasks) && tasks.length
+    ? tasks
+    : Object.keys(TASK_DESCRIPTIONS);
+
+  // ── Headers SSE ──────────────────────────────────────────────────────────────
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const send = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // ── Étape 1 : Lire les fichiers ──────────────────────────────────────────────
+  send('progress', { message: 'Lecture des fichiers...' });
+
+  const logChunks = [];
+  const fileResults = [];
+
+  for (const filePath of files) {
+    const resolved = path.resolve(filePath);
+    const base = path.resolve(config.logsPath);
+    if (!resolved.startsWith(base)) {
+      fileResults.push({ path: filePath, error: 'Chemin non autorisé' });
+      send('file_error', { path: filePath, error: 'Chemin non autorisé' });
+      continue;
+    }
+    try {
+      const { lines, total, truncated } = readLastLines(resolved, config.maxLines);
+      let filtered = filterSecurityLines(lines);
+      if (filtered.length < 5) filtered = lines.slice(-config.maxLines);
+      else filtered = filtered.slice(-config.maxLines);
+      filtered = deduplicateLines(filtered);
+      logChunks.push({
+        file: path.basename(filePath),
+        path: filePath,
+        type: detectLogType(path.basename(filePath)),
+        content: filtered.join('\n'),
+        totalLines: total,
+        filteredLines: filtered.length,
+        truncated,
+      });
+      fileResults.push({ path: filePath, success: true, lines: filtered.length, truncated });
+      send('file_ok', { path: filePath, lines: filtered.length });
+    } catch (e) {
+      const errMsg = e.code === 'EACCES' ? 'Permission refusée' : e.message;
+      fileResults.push({ path: filePath, error: errMsg });
+      send('file_error', { path: filePath, error: errMsg });
+    }
+  }
+
+  if (logChunks.length === 0) {
+    send('error', { message: 'Aucun fichier lisible parmi la sélection' });
+    res.end();
+    return;
+  }
+
+  // ── Étape 2 : Analyser tâche par tâche ──────────────────────────────────────
+  const provider = config.llmProvider || 'ollama';
+  const modelDefaults = {
+    ollama: config.defaultModel, openai: config.openaiModel,
+    gemini: config.geminiModel, claude: config.claudeModel,
+  };
+  const chosenModel = model || modelDefaults[provider] || config.defaultModel;
+
+  console.log(`[Stream] Provider : ${provider}, Modèle : ${chosenModel}, fichiers : ${logChunks.length}, tâches : ${selectedTasks.length}`);
+
+  const taskResults = [];
+
+  for (let i = 0; i < selectedTasks.length; i++) {
+    const task = selectedTasks[i];
+    send('task_start', { task, label: TASK_DESCRIPTIONS[task] || task, index: i + 1, total: selectedTasks.length });
+
+    try {
+      const prompt = buildTaskPrompt(logChunks, task);
+      const rawResponse = await callLLM(prompt, config, chosenModel);
+
+      const jsonMatch =
+        rawResponse.match(/```json\s*([\s\S]*?)\s*```/) ||
+        rawResponse.match(/```\s*([\s\S]*?)\s*```/)     ||
+        rawResponse.match(/(\{[\s\S]*\})/);
+
+      if (!jsonMatch) throw new Error('Réponse JSON invalide');
+      const result = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+
+      taskResults.push({ task, result });
+      send('task_done', { task, findings: result.findings?.length || 0 });
+    } catch (e) {
+      console.error(`[Stream] Erreur tâche ${task} :`, e.message);
+      taskResults.push({ task, result: { findings: [], covered: false, notes: e.message } });
+      send('task_error', { task, error: e.message });
+    }
+  }
+
+  // ── Étape 3 : Fusionner et sauvegarder ──────────────────────────────────────
+  send('progress', { message: 'Fusion des résultats...' });
+
+  const report = mergeTaskResults(taskResults, logChunks);
+
+  const reportId = Date.now().toString();
+  const reportDir = '/app/config/reports';
+  if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
+
+  const reportData = {
+    id: reportId,
+    timestamp: new Date().toISOString(),
+    model: chosenModel,
+    files,
+    fileResults,
+    report,
+  };
+
+  fs.writeFileSync(`${reportDir}/${reportId}.json`, JSON.stringify(reportData, null, 2));
+  updateHistory(reportId, report, files);
+
+  console.log(`[Stream] Rapport ${reportId} — ${report.findings.length} finding(s) — sévérité : ${report.severity_global}`);
+
+  send('done', { reportId, findings: report.findings.length, severity: report.severity_global });
+  res.end();
 });
 
 // ─── Démarrage ────────────────────────────────────────────────────────────────

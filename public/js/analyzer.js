@@ -338,57 +338,100 @@ async function launchAnalysis() {
   state.isAnalyzing = true;
   updateAnalyzeButton();
   showProgress(true);
-  addLog('info', `Démarrage de l'analyse avec ${model}`);
-  addLog('info', `${files.length} fichier(s) · ${tasks.length} tâche(s)`);
-
-  // Simuler une progression pendant l'attente du LLM
-  const progressInterval = simulateProgress();
+  addLog('info', `Démarrage — ${tasks.length} tâche(s) · ${files.length} fichier(s) · ${model}`);
 
   try {
-    addLog('info', 'Lecture et pré-traitement des fichiers...');
-    setProgressLabel('Lecture des fichiers...');
+    const response = await fetch('/api/analyze/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files, model, tasks }),
+    });
 
-    const result = await apiPost('/api/analyze', { files, model, tasks });
+    if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
 
-    clearInterval(progressInterval);
-    setProgress(100);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-    if (result.success) {
-      addLog('success', `Analyse terminée — ${result.report?.findings?.length || 0} finding(s) détecté(s)`);
-      addLog('success', `Sévérité globale : ${result.report?.severity_global}`);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-      // Afficher les résultats de traitement des fichiers
-      result.fileResults?.forEach(fr => {
-        if (fr.error) {
-          addLog('error', `✗ ${fr.path} : ${fr.error}`);
-        } else {
-          addLog('success', `✓ ${fr.path} (${fr.lines} lignes analysées)`);
+      buffer += decoder.decode(value, { stream: true });
+      const messages = buffer.split('\n\n');
+      buffer = messages.pop();
+
+      for (const message of messages) {
+        let eventName = 'message';
+        let data = null;
+        for (const line of message.split('\n')) {
+          if (line.startsWith('event: ')) eventName = line.slice(7).trim();
+          if (line.startsWith('data: ')) {
+            try { data = JSON.parse(line.slice(6)); } catch { /* ignore */ }
+          }
         }
-      });
-
-      showToast(`Analyse complète ! ${result.report?.findings?.length || 0} finding(s)`, 'success', 3000);
-
-      // Rediriger vers le rapport après 1.5s
-      setTimeout(() => {
-        window.location.href = `report.html?id=${result.reportId}`;
-      }, 1500);
-    } else {
-      addLog('error', `Erreur d'analyse : ${result.error}`);
-      if (result.rawResponse) {
-        addLog('warn', 'Le LLM n\'a pas retourné un JSON valide. Vérifiez le modèle sélectionné.');
+        if (data) handleStreamEvent(eventName, data, tasks.length);
       }
-      showToast(result.error || 'Erreur lors de l\'analyse', 'error');
-      state.isAnalyzing = false;
-      showProgress(false);
-      updateAnalyzeButton();
     }
   } catch (e) {
-    clearInterval(progressInterval);
     addLog('error', `Erreur : ${e.message}`);
     showToast(`Erreur : ${e.message}`, 'error');
     state.isAnalyzing = false;
     showProgress(false);
     updateAnalyzeButton();
+  }
+}
+
+function handleStreamEvent(event, data, totalTasks) {
+  switch (event) {
+    case 'progress':
+      setProgressLabel(data.message);
+      break;
+
+    case 'file_ok':
+      addLog('info', `✓ ${data.path} (${data.lines} lignes)`);
+      setProgress(5);
+      break;
+
+    case 'file_error':
+      addLog('error', `✗ ${data.path} : ${data.error}`);
+      break;
+
+    case 'task_start': {
+      const pct = 10 + ((data.index - 1) / totalTasks) * 85;
+      setProgress(pct);
+      setProgressLabel(`[${data.index}/${data.total}] ${data.label}`);
+      addLog('info', `[${data.index}/${data.total}] ${data.label}`);
+      break;
+    }
+
+    case 'task_done':
+      if (data.findings > 0) {
+        addLog('success', `  → ${data.findings} finding(s) détecté(s)`);
+      } else {
+        addLog('info', `  → Aucun problème détecté`);
+      }
+      break;
+
+    case 'task_error':
+      addLog('error', `  → Erreur : ${data.error}`);
+      break;
+
+    case 'done':
+      setProgress(100);
+      setProgressLabel('Analyse terminée');
+      addLog('success', `Analyse complète — ${data.findings} finding(s) — Sévérité : ${data.severity}`);
+      showToast(`Analyse complète ! ${data.findings} finding(s)`, 'success', 3000);
+      setTimeout(() => { window.location.href = `report.html?id=${data.reportId}`; }, 1500);
+      break;
+
+    case 'error':
+      addLog('error', data.message);
+      showToast(data.message, 'error');
+      state.isAnalyzing = false;
+      showProgress(false);
+      updateAnalyzeButton();
+      break;
   }
 }
 
