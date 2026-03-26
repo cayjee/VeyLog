@@ -8,29 +8,8 @@ services:
       - /var/log:/var/log:ro      # Logs du host en lecture seule
       - ./config:/app/config      # Configuration et rapports persistants
     environment:
-      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL=http://host.docker.internal:11434
       - PORT=3000
-    depends_on:
-      - ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Requis sur Linux, inoffensif sur Windows
     restart: unless-stopped
-    networks:
-      - veylog-net
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: veylog-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-    networks:
-      - veylog-net
-
-volumes:
-  ollama_data:
-    name: veylog_ollama_data
-
-networks:
-  veylog-net:
-    name: veylog-network

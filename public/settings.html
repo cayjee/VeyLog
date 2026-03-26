@@ -110,7 +110,7 @@
           <div>
             <label class="form-label">Provider</label>
             <select id="llmProvider" class="form-input" onchange="onProviderChange()" style="background:#1a1d24;border:1px solid #2d3142;color:#e5e7eb;border-radius:6px;padding:8px 12px;font-size:13px;outline:none;">
-              <option value="ollama">Ollama (local)</option>
+              <option value="ollama">Ollama / LLM réseau</option>
               <option value="openai">OpenAI — ChatGPT</option>
               <option value="gemini">Google Gemini</option>
               <option value="claude">Anthropic Claude</option>
@@ -121,8 +121,12 @@
           <div id="sectionOllama" class="space-y-3">
             <div>
               <label class="form-label">URL de l'API Ollama</label>
-              <input type="url" id="ollamaUrl" class="form-input" placeholder="http://ollama:11434">
-              <p class="text-xs text-gray-700 mt-1">Docker Compose : <code class="text-gray-500">http://ollama:11434</code> — Local : <code class="text-gray-500">http://localhost:11434</code></p>
+              <input type="url" id="ollamaUrl" class="form-input" placeholder="http://host.docker.internal:11434">
+              <p class="text-xs text-gray-700 mt-1">
+                Host Windows (GPU) : <code class="text-gray-500">http://host.docker.internal:11434</code> —
+                Autre machine réseau : <code class="text-gray-500">http://192.168.x.x:11434</code> —
+                Container Docker : <code class="text-gray-500">http://ollama:11434</code>
+              </p>
             </div>
             <div>
               <label class="form-label">Modèle par défaut</label>
@@ -146,8 +150,8 @@
               <div class="text-xs text-gray-600 mb-2 tracking-wider">MODÈLES INSTALLÉS</div>
               <div class="space-y-1" id="modelsList"></div>
               <div class="mt-3 p-3 bg-gray-900 border border-gray-800 rounded text-xs">
-                <div class="text-gray-500 mb-1">Pour installer un modèle :</div>
-                <code class="text-cyan-400">docker exec veylog-ollama ollama pull llama3.3:70b</code>
+                <div class="text-gray-500 mb-1">Pour installer un modèle (sur le host) :</div>
+                <code class="text-cyan-400">ollama pull llama3.2</code>
               </div>
             </div>
           </div>
@@ -329,7 +333,7 @@
         const settings = await apiGet('/api/settings');
 
         document.getElementById('llmProvider').value = settings.llmProvider || 'ollama';
-        document.getElementById('ollamaUrl').value   = settings.ollamaUrl   || 'http://ollama:11434';
+        document.getElementById('ollamaUrl').value   = settings.ollamaUrl   || 'http://host.docker.internal:11434';
         document.getElementById('logsPath').value    = settings.logsPath    || '/var/log';
         document.getElementById('maxLines').value    = settings.maxLines    || 300;
         document.getElementById('defaultModelManual').value = settings.defaultModel || '';
@@ -481,7 +485,7 @@
     async function resetDefaults() {
       if (!confirm('Restaurer les paramètres par défaut ?')) return;
       document.getElementById('llmProvider').value      = 'ollama';
-      document.getElementById('ollamaUrl').value        = 'http://ollama:11434';
+      document.getElementById('ollamaUrl').value        = 'http://host.docker.internal:11434';
       document.getElementById('logsPath').value         = '/var/log';
       document.getElementById('maxLines').value         = '300';
       document.getElementById('defaultModelManual').value = '';

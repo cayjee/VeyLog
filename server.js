@@ -25,7 +25,7 @@ const sessions = new Set();
 
 const DEFAULT_CONFIG = {
   logsPath:      process.env.LOGS_PATH     || '/var/log',
-  ollamaUrl:     process.env.OLLAMA_URL    || 'http://ollama:11434',
+  ollamaUrl:     process.env.OLLAMA_URL    || 'http://host.docker.internal:11434',
   defaultModel:  process.env.DEFAULT_MODEL || 'llama3.3:70b',
   maxLines:      parseInt(process.env.MAX_LINES) || 300,
   // Provider LLM : 'ollama' | 'openai' | 'gemini' | 'claude'
