@@ -528,6 +528,7 @@ Réponds UNIQUEMENT avec ce JSON valide (aucun markdown autour) :
       "recommendation": "Action corrective concrète"
     }
   ],
+  "commands_suggested": ["commande shell concrète liée à cette tâche"],
   "covered": true,
   "notes": "Résumé de ce qui a été analysé pour cette tâche"
 }`;
@@ -540,15 +541,39 @@ function mergeTaskResults(taskResults, logChunks) {
   const checklistCoverage = {};
   let suspicious = 0, warnings = 0, errors = 0;
 
+  const allFindingsRaw = [];
+  const commandsSet = new Set();
+
   for (const { task, result } of taskResults) {
-    if (Array.isArray(result.findings)) allFindings.push(...result.findings);
+    if (Array.isArray(result.findings)) allFindingsRaw.push(...result.findings);
+    if (Array.isArray(result.commands_suggested)) {
+      result.commands_suggested.forEach(c => c && commandsSet.add(c));
+    }
     checklistCoverage[task] = { covered: result.covered !== false, notes: result.notes || '' };
-    (result.findings || []).forEach(f => {
-      if (f.severity === 'CRITIQUE' || f.severity === 'ÉLEVÉ') suspicious++;
-      else if (f.severity === 'MOYEN') warnings++;
-      else errors++;
-    });
   }
+
+  // Dédupliquer les findings par première ligne d'evidence (même événement détecté par plusieurs tâches)
+  const severityOrder = ['CRITIQUE', 'ÉLEVÉ', 'MOYEN', 'FAIBLE', 'INFO', 'OK'];
+  const evidenceMap = new Map();
+  for (const f of allFindingsRaw) {
+    const key = (f.evidence && f.evidence[0]) ? f.evidence[0].trim() : f.title;
+    if (!evidenceMap.has(key)) {
+      evidenceMap.set(key, f);
+    } else {
+      // Garder le finding avec la sévérité la plus haute
+      const existing = evidenceMap.get(key);
+      if (severityOrder.indexOf(f.severity) < severityOrder.indexOf(existing.severity)) {
+        evidenceMap.set(key, f);
+      }
+    }
+  }
+  const allFindings = Array.from(evidenceMap.values());
+
+  allFindings.forEach(f => {
+    if (f.severity === 'CRITIQUE' || f.severity === 'ÉLEVÉ') suspicious++;
+    else if (f.severity === 'MOYEN') warnings++;
+    else errors++;
+  });
 
   const severityOrder = ['CRITIQUE', 'ÉLEVÉ', 'MOYEN', 'FAIBLE', 'INFO', 'OK'];
   let severityGlobal = 'OK';
@@ -582,7 +607,7 @@ function mergeTaskResults(taskResults, logChunks) {
     findings: allFindings,
     checklist_coverage: checklistCoverage,
     recommendations,
-    commands_suggested: [],
+    commands_suggested: [...commandsSet],
   };
 }
 

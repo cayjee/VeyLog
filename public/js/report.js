@@ -288,6 +288,45 @@ function renderChecklist(coverage) {
 
 // ─── Recommandations ──────────────────────────────────────────────────────────
 
+function exportRecommendations() {
+  const report = currentReport?.report;
+  if (!report) return;
+
+  const lines = [];
+  lines.push(`# Recommandations Veylog — ${new Date().toLocaleDateString('fr-FR')}`);
+  lines.push(`Sévérité globale : ${report.severity_global}`);
+  lines.push('');
+
+  if (report.recommendations?.length) {
+    lines.push('## Recommandations');
+    report.recommendations.forEach((r, i) => lines.push(`${i + 1}. ${r}`));
+    lines.push('');
+  }
+
+  if (report.commands_suggested?.length) {
+    lines.push('## Commandes suggérées');
+    report.commands_suggested.forEach(c => lines.push(`    ${c}`));
+    lines.push('');
+  }
+
+  if (report.findings?.length) {
+    lines.push('## Findings');
+    report.findings.forEach((f, i) => {
+      lines.push(`### #${i + 1} [${f.severity}] ${f.title}`);
+      lines.push(`Catégorie : ${f.category}`);
+      lines.push(`${f.description}`);
+      if (f.recommendation) lines.push(`Action : ${f.recommendation}`);
+      lines.push('');
+    });
+  }
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `veylog-rapport-${Date.now()}.md`;
+  a.click();
+}
+
 function renderRecommendations(recommendations) {
   const container = document.getElementById('recommendationsList');
   if (!container) return;
